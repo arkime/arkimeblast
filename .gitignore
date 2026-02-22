@@ -1,0 +1,10 @@
+# Build artifacts
+arkimeblast
+src/*.o
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
