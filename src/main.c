@@ -163,37 +163,6 @@ static void print_usage(const char *prog)
         DEFAULT_DURATION, DEFAULT_SEED);
 }
 
-/* Parse --mix http:50,https:40,dns:10 */
-static int parse_mix(const char *arg, int *http, int *https, int *dns)
-{
-    *http = 0; *https = 0; *dns = 0;
-    char buf[128];
-    strncpy(buf, arg, sizeof(buf) - 1);
-    buf[sizeof(buf) - 1] = '\0';
-
-    char *tok = strtok(buf, ",");
-    while (tok) {
-        char *colon = strchr(tok, ':');
-        if (!colon) return -1;
-        *colon = '\0';
-        int val = atoi(colon + 1);
-
-        if (strcmp(tok, "http") == 0)       *http = val;
-        else if (strcmp(tok, "https") == 0) *https = val;
-        else if (strcmp(tok, "dns") == 0)   *dns = val;
-        else { fprintf(stderr, "Unknown protocol: %s\n", tok); return -1; }
-
-        tok = strtok(NULL, ",");
-    }
-
-    if (*http + *https + *dns != 100) {
-        fprintf(stderr, "Mix percentages must sum to 100 (got %d)\n",
-            *http + *https + *dns);
-        return -1;
-    }
-    return 0;
-}
-
 int main(int argc, char *argv[])
 {
     memset(&g_state, 0, sizeof(g_state));

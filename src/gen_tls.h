@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "config.h"
+#include "config-core.h"
 
 /* Pick a random TLS version based on distribution (1.3 ~70%, 1.2 ~25%, 1.0/1.1 ~5%) */
 uint16_t gen_tls_pick_version(uint64_t *rng);

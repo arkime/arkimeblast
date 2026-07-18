@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "config.h"
+#include "config-core.h"
 
 typedef enum {
     PROTO_HTTP,

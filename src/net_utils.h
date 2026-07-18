@@ -3,10 +3,14 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "config.h"
+#include "config-core.h"
 
 /* Parse "x.x.x.x/N" into subnet_t */
 int parse_cidr(const char *cidr, subnet_t *subnet);
+
+/* Parse "http:50,https:40,dns:10" into percentages. Returns 0 on success,
+ * -1 if malformed or the percentages don't sum to 100. */
+int parse_mix(const char *arg, int *http, int *https, int *dns);
 
 /* Generate random IP within subnet */
 uint32_t random_ip(const subnet_t *subnet, uint64_t *rng);
@@ -22,6 +26,14 @@ void rng_seed(uint64_t *state, uint64_t seed);
 
 /* Random number in [0, max) */
 uint32_t rng_range(uint64_t *state, uint32_t max);
+
+/* Fill buf with n pseudo-random bytes using one rng_next() per 8 bytes
+ * (~8x fewer RNG calls than a per-byte loop). Content stays fully varied. */
+void rng_fill(uint8_t *buf, size_t n, uint64_t *state);
+
+/* Like rng_fill but emits pseudo-random printable ASCII (a 64-character set).
+ * Same ~8x speedup; suitable for HTTP bodies and other text-ish payloads. */
+void rng_fill_printable(uint8_t *buf, size_t n, uint64_t *state);
 
 /* IP header checksum */
 uint16_t ip_checksum(const void *data, size_t len);

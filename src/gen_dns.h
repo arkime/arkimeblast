@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "config.h"
+#include "config-core.h"
 
 /* Pick a random DNS query type based on distribution */
 uint16_t gen_dns_pick_qtype(uint64_t *rng);

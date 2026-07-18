@@ -249,9 +249,8 @@ int gen_http_body_chunk(uint8_t *buf, size_t bufsize, size_t offset,
     if (chunk > bufsize)
         chunk = bufsize;
 
-    /* Fill with printable ASCII */
-    for (size_t i = 0; i < chunk; i++)
-        buf[i] = (uint8_t)(0x20 + rng_range(rng, 95));
+    /* Fill with printable ASCII (8 bytes per RNG call, not one) */
+    rng_fill_printable(buf, chunk, rng);
 
     return (int)chunk;
 }

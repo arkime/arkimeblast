@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "config.h"
+#include "config-core.h"
 
 /* Generate an HTTP request. Returns bytes written to buf. */
 int gen_http_request(uint8_t *buf, size_t bufsize, uint64_t *rng);
