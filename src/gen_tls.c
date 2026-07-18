@@ -464,8 +464,7 @@ int gen_tls_certificate(uint8_t *buf, size_t bufsize, uint64_t *rng)
     put16(p + off, (uint16_t)tbs_len); off += 2;
 
     /* Fill with random data */
-    for (int i = 0; i < tbs_len; i++)
-        p[off++] = (uint8_t)rng_next(rng);
+    rng_fill(p + off, (size_t)tbs_len, rng); off += tbs_len;
 
     /* signatureAlgorithm */
     p[off++] = 0x30; p[off++] = 0x0d;
@@ -482,8 +481,12 @@ int gen_tls_certificate(uint8_t *buf, size_t bufsize, uint64_t *rng)
         p[off++] = 0x82;
         put16(p + off, (uint16_t)(sig_remaining - 4)); off += 2;
         p[off++] = 0x00;
-        for (int i = 0; i < sig_remaining - 5 && off < (int)bufsize - 20; i++)
-            p[off++] = (uint8_t)rng_next(rng);
+        int fill = sig_remaining - 5;
+        if (fill > (int)bufsize - 20 - off)
+            fill = (int)bufsize - 20 - off;
+        if (fill > 0) {
+            rng_fill(p + off, (size_t)fill, rng); off += fill;
+        }
     }
 
     put24(p + cert_list_off, (uint32_t)(off - cert_list_start));

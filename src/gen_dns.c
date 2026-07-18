@@ -246,8 +246,7 @@ int gen_dns_response(uint8_t *buf, size_t bufsize, uint16_t txid,
                 buf[off++] = (ttl >> 8) & 0xff;
                 buf[off++] = ttl & 0xff;
                 buf[off++] = 0; buf[off++] = 16; /* RDLENGTH */
-                for (int j = 0; j < 16; j++)
-                    buf[off++] = (uint8_t)rng_next(rng);
+                rng_fill(buf + off, 16, rng); off += 16;
                 ancount++;
             }
             break;

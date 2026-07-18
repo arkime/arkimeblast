@@ -105,6 +105,66 @@ Sending traffic... (Ctrl-C to stop)
 - **Session state machine**: each session progresses through protocol-appropriate TCP/UDP states
 - **Zero external dependencies**: only libc and Linux kernel headers
 
+## Arkime reader plugin (`plugin/`)
+
+The same packet generator can run **inside Arkime** as a capture reader, instead
+of blasting a live NIC. Arkime then manufactures the traffic internally — no pcap
+files, no interface — and processes it through its normal parse/session/ES path.
+This is handy for deterministic test data: the same seed produces the exact same
+packets, and (via a synthetic clock) the exact same timestamps, every run.
+
+The generator sources in `src/` are reused unchanged; only `plugin/reader-synthetic.c`
+is Arkime-specific. Arkime's `arkime_*` symbols are resolved at load time from the
+capture binary, so nothing from Arkime is statically linked (`src/main.c` and the
+AF_PACKET delivery layer are **not** part of the plugin).
+
+### Build the plugin
+
+Assumes an Arkime source checkout is available (defaults to `../../arkime`):
+
+```
+cd plugin
+make ARKIME=/path/to/arkime      # -> plugin/reader-synthetic.so
+```
+
+### Run capture with it
+
+The reader is selected with `pcapReadMethod=synthetic`. Because a reader must be
+registered *before* the reader is chosen, the plugin has to be listed in
+`rootPlugins=` (not `plugins=`). Run capture with **no** `-r`/`-R` so it takes the
+live-reader path. All generator options go in a single `arkimeBlastCmdLine` string
+using the same flags as the standalone tool:
+
+```
+capture/capture -c config.ini -n test \
+    -o pcapReadMethod=synthetic \
+    -o 'pluginsDir=/path/to/arkimeblast/plugin' \
+    -o rootPlugins=reader-synthetic.so \
+    -o packetThreads=1 \
+    -o 'arkimeBlastCmdLine=--seed 42 --max-sessions 20 --mix http:100,https:0,dns:0'
+```
+
+After generating the requested traffic the reader calls `arkime_quit()`, so capture
+flushes all sessions to Elasticsearch and exits cleanly.
+
+For fully reproducible output, keep the single generator thread (built in) **and**
+set `packetThreads=1` — Arkime's per-packet thread assignment is salted with the
+wall clock, so more than one packet thread can reorder session-to-thread mapping.
+
+### `arkimeBlastCmdLine` options
+
+Honored: `--seed N`, `--mix http:..,https:..,dns:..`, `--subnet-src CIDR`,
+`--subnet-dst CIDR`, `--max-packets N`.
+
+Plugin-only: `--max-sessions N` (default 100; `0` = unbounded), `--base-time SEC`
+(synthetic-clock start, default 1700000000), `--time-delta US` (per-packet
+timestamp increment, default 100), `--run-forever` (ignore counts / never
+auto-quit — load-test mode; stop with SIGINT).
+
+Delivery-only flags (`--interface`, `--gbps`, `--threads`, `--duration`,
+`--max-gb`, `--verbose`) are accepted and ignored, so a standalone blast command
+line can be pasted in as-is.
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE) for details.

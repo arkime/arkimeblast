@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "config.h"
+#include "config-core.h"
 #include "session.h"
 
 /* Build a TCP SYN packet. Returns total frame length. */

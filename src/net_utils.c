@@ -43,6 +43,42 @@ uint32_t rng_range(uint64_t *state, uint32_t max)
     return (uint32_t)(rng_next(state) % max);
 }
 
+void rng_fill(uint8_t *buf, size_t n, uint64_t *state)
+{
+    size_t i = 0;
+    for (; i + 8 <= n; i += 8) {
+        uint64_t r = rng_next(state);
+        memcpy(buf + i, &r, 8);       /* 8 payload bytes per RNG call */
+    }
+    if (i < n) {
+        uint64_t r = rng_next(state);
+        memcpy(buf + i, &r, n - i);
+    }
+}
+
+void rng_fill_printable(uint8_t *buf, size_t n, uint64_t *state)
+{
+    /* 64 printable chars -> 6 bits index, but we key off whole bytes (mask 0x3f)
+     * so we still get 8 characters out of each 64-bit RNG word. */
+    static const char lut[64] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .";
+    size_t i = 0;
+    for (; i + 8 <= n; i += 8) {
+        uint64_t r = rng_next(state);
+        for (int k = 0; k < 8; k++) {
+            buf[i + k] = (uint8_t)lut[r & 0x3f];
+            r >>= 8;
+        }
+    }
+    if (i < n) {
+        uint64_t r = rng_next(state);
+        for (; i < n; i++) {
+            buf[i] = (uint8_t)lut[r & 0x3f];
+            r >>= 8;
+        }
+    }
+}
+
 /* ---------- CIDR parsing ---------- */
 
 int parse_cidr(const char *cidr, subnet_t *subnet)
@@ -70,6 +106,37 @@ int parse_cidr(const char *cidr, subnet_t *subnet)
     /* Zero out host bits */
     subnet->base &= ~((1U << subnet->mask) - 1);
 
+    return 0;
+}
+
+/* Parse --mix http:50,https:40,dns:10 */
+int parse_mix(const char *arg, int *http, int *https, int *dns)
+{
+    *http = 0; *https = 0; *dns = 0;
+    char buf[128];
+    strncpy(buf, arg, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    char *tok = strtok(buf, ",");
+    while (tok) {
+        char *colon = strchr(tok, ':');
+        if (!colon) return -1;
+        *colon = '\0';
+        int val = atoi(colon + 1);
+
+        if (strcmp(tok, "http") == 0)       *http = val;
+        else if (strcmp(tok, "https") == 0) *https = val;
+        else if (strcmp(tok, "dns") == 0)   *dns = val;
+        else { fprintf(stderr, "Unknown protocol: %s\n", tok); return -1; }
+
+        tok = strtok(NULL, ",");
+    }
+
+    if (*http + *https + *dns != 100) {
+        fprintf(stderr, "Mix percentages must sum to 100 (got %d)\n",
+            *http + *https + *dns);
+        return -1;
+    }
     return 0;
 }
 
