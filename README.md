@@ -145,21 +145,38 @@ capture/capture -c config.ini -n test \
 ```
 
 After generating the requested traffic the reader calls `arkime_quit()`, so capture
-flushes all sessions to Elasticsearch and exits cleanly.
+flushes all sessions to Elasticsearch and exits cleanly (with several reader
+threads, the last one to finish makes the call).
 
-For fully reproducible output, keep the single generator thread (built in) **and**
+For fully reproducible output, keep `--reader-threads 1` (the default) **and**
 set `packetThreads=1` — Arkime's per-packet thread assignment is salted with the
 wall clock, so more than one packet thread can reorder session-to-thread mapping.
+
+### Multiple reader threads
+
+`--reader-threads N` (1–64, default 1) runs N independent generator threads, each
+enqueueing into Arkime's packet threads the way a multi-queue live reader
+(tpacketv3, netmap) does. Use it to put write pressure on capture's shared
+counters and packet queues — with a single reader thread, contention that only
+appears with several readers stays invisible.
+
+Each thread gets its own rng stream (`seed + thread`), its own synthetic clock
+(thread *t* starts at `base + t*delta` and steps by `delta*N`, so no two threads
+ever emit the same timestamp), and its own share of `--max-sessions` /
+`--max-packets` (thread 0 takes the remainder). So each thread is individually
+reproducible and the total packet count for a given seed is stable, but the
+threads interleave freely — the order packets reach capture, and therefore
+Arkime's session-to-thread mapping, varies run to run.
 
 ### `arkimeBlastCmdLine` options
 
 Honored: `--seed N`, `--mix http:..,https:..,dns:..`, `--subnet-src CIDR`,
 `--subnet-dst CIDR`, `--max-packets N`.
 
-Plugin-only: `--max-sessions N` (default 100; `0` = unbounded), `--base-time SEC`
-(synthetic-clock start, default 1700000000), `--time-delta US` (per-packet
-timestamp increment, default 100), `--run-forever` (ignore counts / never
-auto-quit — load-test mode; stop with SIGINT).
+Plugin-only: `--max-sessions N` (default 100; `0` = unbounded), `--reader-threads N`
+(default 1, max 64), `--base-time SEC` (synthetic-clock start, default 1700000000),
+`--time-delta US` (per-packet timestamp increment, default 100), `--run-forever`
+(ignore counts / never auto-quit — load-test mode; stop with SIGINT).
 
 Delivery-only flags (`--interface`, `--gbps`, `--threads`, `--duration`,
 `--max-gb`, `--verbose`) are accepted and ignored, so a standalone blast command
