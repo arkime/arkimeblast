@@ -44,6 +44,7 @@ LOCAL uint64_t      seed        = 0;
 
 LOCAL uint64_t      baseTimeUS  = 1700000000ULL * 1000000ULL; /* synth clock   */
 LOCAL uint64_t      timeDeltaUS = 100;  /* per-packet timestamp increment (us) */
+LOCAL int           flushEvery  = 1;    /* packets per batch flush             */
 
 /* Per generator thread state. Cache aligned so the counters of one thread
  * never share a line with another's -- this reader is used for capture
@@ -121,6 +122,7 @@ LOCAL void synthetic_parse_cmdline(void)
         {"time-delta",     required_argument, 0, 'T'},
         {"run-forever",    no_argument,       0, 'f'},
         {"reader-threads", required_argument, 0, 'R'},
+        {"flush-every",    required_argument, 0, 'F'},
         {0, 0, 0, 0}
     };
 
@@ -134,7 +136,7 @@ LOCAL void synthetic_parse_cmdline(void)
     opterr = 0; /* stay quiet on unknown flags rather than spamming stderr */
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "i:g:t:d:G:vm:S:D:P:s:M:b:T:fR:",
+    while ((opt = getopt_long(argc, argv, "i:g:t:d:G:vm:S:D:P:s:M:b:T:fR:F:",
                               long_opts, NULL)) != -1) {
         switch (opt) {
         case 'm':
@@ -158,6 +160,11 @@ LOCAL void synthetic_parse_cmdline(void)
             break;
         case 'T': timeDeltaUS = (uint64_t)strtoull(optarg, NULL, 10); break;
         case 'f': runForever  = 1; break;
+        case 'F':
+            flushEvery = atoi(optarg);
+            if (flushEvery < 1)
+                flushEvery = 1;
+            break;
         case 'R':
             numThreads = atoi(optarg);
             if (numThreads < 1 || numThreads > SYN_MAX_THREADS)
@@ -202,6 +209,7 @@ LOCAL void *synthetic_thread(gpointer uw)
     arkime_packet_batch_init(&batch);
 
     uint8_t   buf[MAX_PACKET_SIZE];  /* reused; arkime_packet_batch copies it   */
+    int       flushCnt = 0;
     session_t session;
     int       need_new = 1;
 
@@ -221,7 +229,7 @@ LOCAL void *synthetic_thread(gpointer uw)
 
         int len = session_step(&session, buf, &st->ctx);
         if (len == 0) { need_new = 1; continue; }  /* session complete         */
-        if (len < 0)  { st->dropped++; continue; } /* simulated drop           */
+        if (len < 0)  { __atomic_fetch_add(&st->dropped, 1, __ATOMIC_RELAXED); continue; } /* simulated drop */
         if (len <= 4) continue;                    /* batch would reject       */
 
         ArkimePacket_t *packet = arkime_packet_alloc();
@@ -232,8 +240,11 @@ LOCAL void *synthetic_thread(gpointer uw)
         /* copied stays 0 -> arkime_packet_batch mallocs+copies buf on enqueue */
 
         arkime_packet_batch(&batch, packet);
-        arkime_packet_batch_flush(&batch);
-        st->packets++;
+        if (++flushCnt >= flushEvery) {
+            arkime_packet_batch_flush(&batch);
+            flushCnt = 0;
+        }
+        __atomic_fetch_add(&st->packets, 1, __ATOMIC_RELAXED);
     }
 
     arkime_packet_batch_flush(&batch);
@@ -267,8 +278,8 @@ LOCAL int synthetic_stats(ArkimeReaderStats_t *stats)
     stats->total   = 0;
     stats->dropped = 0;
     for (int t = 0; t < numThreads; t++) {
-        stats->total   += synThreads[t].packets;
-        stats->dropped += synThreads[t].dropped;
+        stats->total   += __atomic_load_n(&synThreads[t].packets, __ATOMIC_RELAXED);
+        stats->dropped += __atomic_load_n(&synThreads[t].dropped, __ATOMIC_RELAXED);
     }
     return 0;
 }

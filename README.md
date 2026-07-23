@@ -174,9 +174,11 @@ Honored: `--seed N`, `--mix http:..,https:..,dns:..`, `--subnet-src CIDR`,
 `--subnet-dst CIDR`, `--max-packets N`.
 
 Plugin-only: `--max-sessions N` (default 100; `0` = unbounded), `--reader-threads N`
-(default 1, max 64), `--base-time SEC` (synthetic-clock start, default 1700000000),
-`--time-delta US` (per-packet timestamp increment, default 100), `--run-forever`
-(ignore counts / never auto-quit — load-test mode; stop with SIGINT).
+(default 1, max 64), `--flush-every N` (packets per batch flush into Arkime's packet
+queues, default 1; larger values behave like block-based readers such as tpacketv3),
+`--base-time SEC` (synthetic-clock start, default 1700000000), `--time-delta US`
+(per-packet timestamp increment, default 100), `--run-forever` (ignore counts /
+never auto-quit — load-test mode; stop with SIGINT).
 
 Delivery-only flags (`--interface`, `--gbps`, `--threads`, `--duration`,
 `--max-gb`, `--verbose`) are accepted and ignored, so a standalone blast command
