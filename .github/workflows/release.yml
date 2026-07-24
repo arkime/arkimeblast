@@ -1,0 +1,96 @@
+name: Build and Release
+
+# Build portable, statically-linked Linux binaries for amd64 and arm64.
+# arkimeblast has no external library dependencies (just libc + pthread), so a
+# static binary built on Ubuntu 24.04 runs on virtually any modern Linux host of
+# the matching architecture.
+#
+# Push a tag like `v0.1.0` to build and publish a GitHub Release with both
+# binaries attached. `workflow_dispatch` builds the artifacts without releasing.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so `git describe` works for dispatch builds
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            # Tag builds: strip the leading `v` (v0.1.0 -> 0.1.0)
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building version: ${VERSION}"
+
+      - name: Build (portable static binary)
+        run: |
+          make VERSION='${{ steps.version.outputs.version }}' ARCH_FLAGS= EXTRA_LDFLAGS=-static
+
+      - name: Verify binary
+        run: |
+          file ./arkimeblast
+          # Confirm it is statically linked (no dynamic dependencies)
+          ldd ./arkimeblast || true
+          ./arkimeblast --version
+
+      - name: Package
+        id: package
+        run: |
+          PKG="arkimeblast-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}"
+          mkdir -p "dist/${PKG}"
+          cp arkimeblast README.md LICENSE "dist/${PKG}/"
+          tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
+          ( cd dist && sha256sum "${PKG}.tar.gz" > "${PKG}.tar.gz.sha256" )
+          echo "pkg=${PKG}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.pkg }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # required to create the release
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+          generate_release_notes: true

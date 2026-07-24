@@ -9,7 +9,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define ARKIMEBLAST_VERSION "0.1.0"
+/* Fallback version for builds that don't inject one. Release builds and any
+ * `make` in a git checkout override this via -DARKIMEBLAST_VERSION, which the
+ * Makefile derives from the git tag / describe (see VERSION in Makefile). This
+ * sentinel only appears for builds made outside a git checkout, and is
+ * deliberately not a real release number so it can't be mistaken for one. */
+#ifndef ARKIMEBLAST_VERSION
+#define ARKIMEBLAST_VERSION "0.0.0-dev"
+#endif
 
 #define DEFAULT_GBPS        1.0
 #define DEFAULT_MIX_HTTP    50

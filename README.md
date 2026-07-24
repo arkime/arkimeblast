@@ -30,6 +30,20 @@ Generates realistic HTTP, HTTPS, and DNS traffic using Linux AF_PACKET TX rings 
 make
 ```
 
+The local build uses `-march=native` for a machine-optimized binary. To build a
+portable binary (e.g. to copy to another host), disable native tuning:
+
+```bash
+make ARCH_FLAGS=
+```
+
+## Releases
+
+Prebuilt, statically-linked Linux binaries for `amd64` and `arm64` are attached
+to each [GitHub Release](https://github.com/arkime/arkimeblast/releases). They
+have no library dependencies and run on any modern Linux host of the matching
+architecture. A release is produced by pushing a version tag (e.g. `v0.1.0`).
+
 ## Usage
 
 ```
@@ -46,6 +60,7 @@ arkimeblast [options]
       --max-gb <N>            Stop after N gigabytes sent (default: unlimited)
       --seed <N>              RNG seed for reproducibility (default: 0)
   -v, --verbose               Print per-second stats
+  -V, --version               Show version and exit
   -h, --help                  Show help
 ```
 

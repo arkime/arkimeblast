@@ -156,6 +156,7 @@ static void print_usage(const char *prog)
         "      --max-gb <N>            Stop after N gigabytes sent (default: unlimited)\n"
         "      --seed <N>              RNG seed (default: %d)\n"
         "  -v, --verbose               Per-second stats\n"
+        "  -V, --version               Show version and exit\n"
         "  -h, --help                  Show this help\n\n",
         prog, DEFAULT_GBPS,
         DEFAULT_MIX_HTTP, DEFAULT_MIX_HTTPS, DEFAULT_MIX_DNS,
@@ -197,12 +198,13 @@ int main(int argc, char *argv[])
         {"max-gb",     required_argument, 0, 'G'},
         {"seed",       required_argument, 0, 's'},
         {"verbose",    no_argument,       0, 'v'},
+        {"version",    no_argument,       0, 'V'},
         {"help",       no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "i:vh", long_opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "i:vVh", long_opts, NULL)) != -1) {
         switch (opt) {
         case 'i':
             strncpy(cfg->interface, optarg, sizeof(cfg->interface) - 1);
@@ -249,6 +251,9 @@ int main(int argc, char *argv[])
         case 'v':
             cfg->verbose = 1;
             break;
+        case 'V':
+            printf("arkimeblast %s\n", ARKIMEBLAST_VERSION);
+            return 0;
         case 'h':
             print_usage(argv[0]);
             return 0;
