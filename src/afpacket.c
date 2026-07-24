@@ -12,6 +12,20 @@
 #include <net/if.h>
 #include <sched.h>
 
+/* Portable CPU spin-wait hint: emit the architecture's pause/yield instruction
+ * so a busy spin doesn't hammer the pipeline. Falls back to a compiler barrier
+ * on unknown architectures. */
+static inline void cpu_relax(void)
+{
+#if defined(__i386__) || defined(__x86_64__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__) || defined(__arm__)
+    __asm__ __volatile__("yield" ::: "memory");
+#else
+    __asm__ __volatile__("" ::: "memory");
+#endif
+}
+
 int afpacket_setup(thread_ctx_t *ctx)
 {
     int fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -116,7 +130,7 @@ int afpacket_send(thread_ctx_t *ctx, const uint8_t *frame, size_t len)
             if (!*ctx->running)
                 return -1;
             if (++spins < 10000) {
-                __builtin_ia32_pause(); /* CPU spin-wait hint */
+                cpu_relax(); /* CPU spin-wait hint */
             } else {
                 spins = 0;
                 sendto(ctx->sock_fd, NULL, 0, MSG_DONTWAIT, NULL, 0);
